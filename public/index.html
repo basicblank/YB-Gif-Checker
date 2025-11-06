@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GIF Checker - YB</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            padding: 40px;
+            max-width: 600px;
+            width: 100%;
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 2em;
+            text-align: center;
+        }
+
+        .subtitle {
+            color: #666;
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 0.9em;
+        }
+
+        .upload-area {
+            border: 3px dashed #667eea;
+            border-radius: 15px;
+            padding: 40px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            background: #f8f9ff;
+        }
+
+        .upload-area:hover {
+            border-color: #764ba2;
+            background: #f0f1ff;
+        }
+
+        .upload-area.dragover {
+            border-color: #764ba2;
+            background: #e8e9ff;
+            transform: scale(1.02);
+        }
+
+        .upload-icon {
+            font-size: 3em;
+            margin-bottom: 15px;
+            color: #667eea;
+        }
+
+        .upload-text {
+            color: #666;
+            margin-bottom: 10px;
+            font-size: 1.1em;
+        }
+
+        .file-info {
+            color: #999;
+            font-size: 0.85em;
+        }
+
+        input[type="file"] {
+            display: none;
+        }
+
+        .btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 25px;
+            font-size: 1em;
+            cursor: pointer;
+            margin-top: 20px;
+            width: 100%;
+            transition: transform 0.2s ease;
+            font-weight: 600;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+        }
+
+        .btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .results {
+            margin-top: 30px;
+            padding: 25px;
+            background: #f8f9ff;
+            border-radius: 15px;
+            display: none;
+        }
+
+        .results.show {
+            display: block;
+            animation: slideIn 0.3s ease;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .results h2 {
+            color: #333;
+            margin-bottom: 20px;
+            font-size: 1.5em;
+        }
+
+        .result-item {
+            padding: 15px;
+            margin-bottom: 12px;
+            border-radius: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: white;
+        }
+
+        .result-label {
+            color: #666;
+            font-weight: 600;
+        }
+
+        .result-value {
+            font-weight: bold;
+            padding: 5px 15px;
+            border-radius: 20px;
+        }
+
+        .result-value.success {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .result-value.warning {
+            background: #fff3cd;
+            color: #856404;
+        }
+
+        .result-value.danger {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .result-value.info {
+            background: #d1ecf1;
+            color: #0c5460;
+        }
+
+        .loading {
+            text-align: center;
+            color: #667eea;
+            margin-top: 20px;
+            display: none;
+        }
+
+        .loading.show {
+            display: block;
+        }
+
+        .spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 10px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            padding: 15px;
+            border-radius: 10px;
+            margin-top: 20px;
+            display: none;
+        }
+
+        .error.show {
+            display: block;
+        }
+
+        .selected-file {
+            background: #e8e9ff;
+            padding: 15px;
+            border-radius: 10px;
+            margin-top: 15px;
+            display: none;
+        }
+
+        .selected-file.show {
+            display: block;
+        }
+
+        .selected-file strong {
+            color: #667eea;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>GIF Checker</h1>
+        <p class="subtitle">Upload a GIF file to analyze its duration and loop count</p>
+
+        <div class="upload-area" id="uploadArea">
+            <div class="upload-icon">📁</div>
+            <div class="upload-text">Click to browse or drag and drop</div>
+            <div class="file-info">Only .gif files allowed</div>
+            <input type="file" id="fileInput" accept=".gif,image/gif">
+        </div>
+
+        <div class="selected-file" id="selectedFile">
+            <strong>Selected:</strong> <span id="fileName"></span>
+        </div>
+
+        <button class="btn" id="uploadBtn" disabled>Analyze GIF</button>
+
+        <div class="loading" id="loading">
+            <div class="spinner"></div>
+            <div>Analyzing GIF...</div>
+        </div>
+
+        <div class="error" id="error"></div>
+
+        <div class="results" id="results">
+            <h2>Analysis Results</h2>
+            <div class="result-item">
+                <span class="result-label">File Name:</span>
+                <span class="result-value info" id="resultFileName"></span>
+            </div>
+            <div class="result-item">
+                <span class="result-label">Duration:</span>
+                <span class="result-value" id="resultDuration"></span>
+            </div>
+            <div class="result-item">
+                <span class="result-label">Loop Count:</span>
+                <span class="result-value" id="resultLoops"></span>
+            </div>
+            <div class="result-item">
+                <span class="result-label">Exceeds 15 seconds?</span>
+                <span class="result-value" id="resultExceedsDuration"></span>
+            </div>
+            <div class="result-item">
+                <span class="result-label">Loops more than 3 times?</span>
+                <span class="result-value" id="resultExceedsLoops"></span>
+            </div>
+            <div class="result-item">
+                <span class="result-label">Animated:</span>
+                <span class="result-value info" id="resultAnimated"></span>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const uploadArea = document.getElementById('uploadArea');
+        const fileInput = document.getElementById('fileInput');
+        const uploadBtn = document.getElementById('uploadBtn');
+        const loading = document.getElementById('loading');
+        const error = document.getElementById('error');
+        const results = document.getElementById('results');
+        const selectedFile = document.getElementById('selectedFile');
+        const fileName = document.getElementById('fileName');
+
+        let selectedGifFile = null;
+
+        // Click to upload
+        uploadArea.addEventListener('click', () => {
+            fileInput.click();
+        });
+
+        // File selection
+        fileInput.addEventListener('change', (e) => {
+            handleFileSelect(e.target.files[0]);
+        });
+
+        // Drag and drop
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.classList.add('dragover');
+        });
+
+        uploadArea.addEventListener('dragleave', () => {
+            uploadArea.classList.remove('dragover');
+        });
+
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.classList.remove('dragover');
+            handleFileSelect(e.dataTransfer.files[0]);
+        });
+
+        function handleFileSelect(file) {
+            if (!file) return;
+
+            if (file.type !== 'image/gif') {
+                showError('Please select a valid .gif file');
+                return;
+            }
+
+            selectedGifFile = file;
+            fileName.textContent = file.name;
+            selectedFile.classList.add('show');
+            uploadBtn.disabled = false;
+            error.classList.remove('show');
+            results.classList.remove('show');
+        }
+
+        // Upload and analyze
+        uploadBtn.addEventListener('click', async () => {
+            if (!selectedGifFile) return;
+
+            const formData = new FormData();
+            formData.append('gifFile', selectedGifFile);
+
+            loading.classList.add('show');
+            uploadBtn.disabled = true;
+            error.classList.remove('show');
+            results.classList.remove('show');
+
+            try {
+                const response = await fetch('/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await response.json();
+
+                loading.classList.remove('show');
+
+                if (data.success) {
+                    displayResults(data);
+                } else {
+                    showError(data.error || 'Error analyzing GIF');
+                }
+            } catch (err) {
+                loading.classList.remove('show');
+                showError('Failed to upload file: ' + err.message);
+            }
+
+            uploadBtn.disabled = false;
+        });
+
+        function displayResults(data) {
+            const analysis = data.analysis;
+
+            document.getElementById('resultFileName').textContent = data.filename;
+
+            // Duration
+            const durationEl = document.getElementById('resultDuration');
+            durationEl.textContent = `${analysis.durationSeconds}s`;
+            durationEl.className = 'result-value info';
+
+            // Loop count
+            const loopsEl = document.getElementById('resultLoops');
+            loopsEl.textContent = analysis.loopCount === Infinity ? 'Infinite' : analysis.loopCount;
+            loopsEl.className = 'result-value info';
+
+            // Exceeds duration
+            const exceedsDurationEl = document.getElementById('resultExceedsDuration');
+            exceedsDurationEl.textContent = analysis.exceedsDuration ? 'YES' : 'NO';
+            exceedsDurationEl.className = analysis.exceedsDuration ? 'result-value danger' : 'result-value success';
+
+            // Exceeds loops
+            const exceedsLoopsEl = document.getElementById('resultExceedsLoops');
+            exceedsLoopsEl.textContent = analysis.exceedsLoops ? 'YES' : 'NO';
+            exceedsLoopsEl.className = analysis.exceedsLoops ? 'result-value danger' : 'result-value success';
+
+            // Animated
+            const animatedEl = document.getElementById('resultAnimated');
+            animatedEl.textContent = analysis.isAnimated ? 'YES' : 'NO';
+            animatedEl.className = 'result-value info';
+
+            results.classList.add('show');
+        }
+
+        function showError(message) {
+            error.textContent = message;
+            error.classList.add('show');
+        }
+    </script>
+</body>
+</html>
