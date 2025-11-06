@@ -1,57 +1,36 @@
 const express = require('express');
 const multer = require('multer');
-const fs = require('fs');
-const path = require('path');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Ensure uploads directory exists
-const uploadsDir = path.join(__dirname, 'uploads');
-if (!fs.existsSync(uploadsDir)) {
-  fs.mkdirSync(uploadsDir, { recursive: true });
-}
-
-// Configure multer for file uploads
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, uploadsDir);
-  },
-  filename: (req, file, cb) => {
-    cb(null, Date.now() + '-' + file.originalname);
-  }
-});
-
+// Configure multer to use memory storage instead of disk
 const upload = multer({
-  storage: storage,
+  storage: multer.memoryStorage(),
   fileFilter: (req, file, cb) => {
     if (file.mimetype === 'image/gif') {
       cb(null, true);
     } else {
       cb(new Error('Only .gif files are allowed!'), false);
     }
+  },
+  limits: {
+    fileSize: 10 * 1024 * 1024 // 10MB limit
   }
 });
 
 // Serve static files from public directory
 app.use(express.static('public'));
 
-// GIF Analysis Function
-function analyzeGif(filePath) {
+// GIF Analysis Function - now accepts a buffer directly
+function analyzeGif(buffer) {
   return new Promise((resolve, reject) => {
-    fs.readFile(filePath, (err, buffer) => {
-      if (err) {
-        reject(err);
-        return;
-      }
-
-      try {
-        const analysis = parseGif(buffer);
-        resolve(analysis);
-      } catch (error) {
-        reject(error);
-      }
-    });
+    try {
+      const analysis = parseGif(buffer);
+      resolve(analysis);
+    } catch (error) {
+      reject(error);
+    }
   });
 }
 
@@ -207,11 +186,9 @@ app.post('/upload', upload.single('gifFile'), async (req, res) => {
   console.log('File received:', req.file.originalname, 'Size:', req.file.size);
 
   try {
-    const analysis = await analyzeGif(req.file.path);
+    // Use the buffer from memory instead of file path
+    const analysis = await analyzeGif(req.file.buffer);
     console.log('Analysis complete:', analysis);
-
-    // Clean up uploaded file
-    fs.unlinkSync(req.file.path);
 
     res.json({
       success: true,
@@ -220,15 +197,6 @@ app.post('/upload', upload.single('gifFile'), async (req, res) => {
     });
   } catch (error) {
     console.error('Error analyzing GIF:', error);
-
-    // Clean up uploaded file on error
-    if (req.file && req.file.path) {
-      try {
-        fs.unlinkSync(req.file.path);
-      } catch (unlinkError) {
-        console.error('Error deleting file:', unlinkError);
-      }
-    }
 
     res.status(500).json({
       error: 'Error analyzing GIF',
