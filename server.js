@@ -6,10 +6,16 @@ const path = require('path');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// Ensure uploads directory exists
+const uploadsDir = path.join(__dirname, 'uploads');
+if (!fs.existsSync(uploadsDir)) {
+  fs.mkdirSync(uploadsDir, { recursive: true });
+}
+
 // Configure multer for file uploads
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    cb(null, 'uploads/');
+    cb(null, uploadsDir);
   },
   filename: (req, file, cb) => {
     cb(null, Date.now() + '-' + file.originalname);
@@ -191,12 +197,18 @@ function skipSubBlocks(buffer, offset) {
 
 // Upload endpoint
 app.post('/upload', upload.single('gifFile'), async (req, res) => {
+  console.log('Upload request received');
+
   if (!req.file) {
+    console.log('No file in request');
     return res.status(400).json({ error: 'No file uploaded' });
   }
 
+  console.log('File received:', req.file.originalname, 'Size:', req.file.size);
+
   try {
     const analysis = await analyzeGif(req.file.path);
+    console.log('Analysis complete:', analysis);
 
     // Clean up uploaded file
     fs.unlinkSync(req.file.path);
@@ -207,9 +219,15 @@ app.post('/upload', upload.single('gifFile'), async (req, res) => {
       analysis: analysis
     });
   } catch (error) {
+    console.error('Error analyzing GIF:', error);
+
     // Clean up uploaded file on error
     if (req.file && req.file.path) {
-      fs.unlinkSync(req.file.path);
+      try {
+        fs.unlinkSync(req.file.path);
+      } catch (unlinkError) {
+        console.error('Error deleting file:', unlinkError);
+      }
     }
 
     res.status(500).json({
@@ -217,6 +235,15 @@ app.post('/upload', upload.single('gifFile'), async (req, res) => {
       details: error.message
     });
   }
+});
+
+// Error handling middleware
+app.use((err, req, res, next) => {
+  console.error('Express error:', err);
+  if (err instanceof multer.MulterError) {
+    return res.status(400).json({ error: 'File upload error: ' + err.message });
+  }
+  res.status(500).json({ error: err.message || 'Server error' });
 });
 
 // Start server
