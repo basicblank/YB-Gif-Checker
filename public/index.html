@@ -490,6 +490,154 @@
             font-size: 1.2em;
         }
 
+        .preview-btn {
+            background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 8px;
+            font-size: 0.85em;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.2s ease;
+            margin-top: 12px;
+            width: 100%;
+        }
+
+        .preview-btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 8px rgba(99, 102, 241, 0.3);
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(15, 23, 42, 0.95);
+            backdrop-filter: blur(8px);
+            animation: fadeIn 0.3s ease;
+        }
+
+        .modal.show {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .modal-content {
+            background: white;
+            border-radius: 24px;
+            max-width: 90%;
+            max-height: 90vh;
+            overflow-y: auto;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+            animation: slideUp 0.3s ease;
+            position: relative;
+        }
+
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .modal-header {
+            padding: 32px 32px 24px;
+            border-bottom: 1px solid #e2e8f0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .modal-title {
+            font-size: 1.5em;
+            font-weight: 700;
+            color: #0f172a;
+            letter-spacing: -0.025em;
+            word-break: break-word;
+            padding-right: 20px;
+        }
+
+        .close-btn {
+            background: #f1f5f9;
+            border: none;
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            cursor: pointer;
+            font-size: 1.5em;
+            color: #64748b;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s ease;
+            flex-shrink: 0;
+        }
+
+        .close-btn:hover {
+            background: #e2e8f0;
+            color: #0f172a;
+            transform: rotate(90deg);
+        }
+
+        .modal-body {
+            padding: 32px;
+        }
+
+        .preview-container {
+            background: #f8fafc;
+            border-radius: 16px;
+            padding: 24px;
+            text-align: center;
+            margin-bottom: 24px;
+            border: 2px solid #e2e8f0;
+        }
+
+        .preview-container img {
+            max-width: 100%;
+            max-height: 500px;
+            border-radius: 12px;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.2);
+        }
+
+        .preview-info {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 16px;
+            margin-top: 24px;
+        }
+
+        .preview-info-item {
+            background: linear-gradient(to bottom, #ffffff, #f8fafc);
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            padding: 16px;
+            text-align: center;
+        }
+
+        .preview-info-label {
+            color: #64748b;
+            font-size: 0.85em;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+
+        .preview-info-value {
+            color: #0f172a;
+            font-size: 1.5em;
+            font-weight: 700;
+        }
+
         @media (max-width: 768px) {
             .container {
                 padding: 32px 24px;
@@ -579,6 +727,22 @@
         </div>
     </div>
 
+    <!-- Preview Modal -->
+    <div class="modal" id="previewModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title" id="modalTitle"></h3>
+                <button class="close-btn" id="closeModal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="preview-container">
+                    <img id="previewImage" src="" alt="GIF Preview">
+                </div>
+                <div class="preview-info" id="previewInfo"></div>
+            </div>
+        </div>
+    </div>
+
     <script>
         const uploadArea = document.getElementById('uploadArea');
         const fileInput = document.getElementById('fileInput');
@@ -593,9 +757,15 @@
         const resultsContainer = document.getElementById('resultsContainer');
         const resultsCards = document.getElementById('resultsCards');
         const exportBtn = document.getElementById('exportBtn');
+        const previewModal = document.getElementById('previewModal');
+        const closeModal = document.getElementById('closeModal');
+        const modalTitle = document.getElementById('modalTitle');
+        const previewImage = document.getElementById('previewImage');
+        const previewInfo = document.getElementById('previewInfo');
 
         let selectedGifFiles = [];
         let analysisResults = [];
+        let fileDataUrls = {}; // Store file data URLs for preview
 
         // Click to upload
         uploadArea.addEventListener('click', () => {
@@ -653,6 +823,7 @@
         clearBtn.addEventListener('click', () => {
             selectedGifFiles = [];
             analysisResults = [];
+            fileDataUrls = {};
             selectedFiles.classList.remove('show');
             resultsContainer.classList.remove('show');
             uploadBtn.disabled = true;
@@ -680,6 +851,14 @@
                     formData.append('gifFile', file);
 
                     loadingText.textContent = `Analyzing ${completed + 1}/${total}...`;
+
+                    // Create data URL for preview
+                    const dataUrl = await new Promise((resolve) => {
+                        const reader = new FileReader();
+                        reader.onload = (e) => resolve(e.target.result);
+                        reader.readAsDataURL(file);
+                    });
+                    fileDataUrls[file.name] = dataUrl;
 
                     try {
                         const response = await fetch('/upload', {
@@ -800,12 +979,81 @@
                                 </span>
                             </div>
                         </div>
+                        <button class="preview-btn" onclick="showPreview('${result.filename}')">
+                            👁️ Preview GIF
+                        </button>
                     </div>
                 `;
             }).join('');
 
             resultsContainer.classList.add('show');
         }
+
+        // Show preview modal
+        window.showPreview = function(filename) {
+            const result = analysisResults.find(r => r.filename === filename);
+            if (!result || !result.success) return;
+
+            const analysis = result.analysis;
+            const passed = !analysis.exceedsDuration && !analysis.exceedsLoops;
+
+            modalTitle.textContent = filename;
+            previewImage.src = fileDataUrls[filename];
+
+            previewInfo.innerHTML = `
+                <div class="preview-info-item">
+                    <div class="preview-info-label">Status</div>
+                    <div class="preview-info-value" style="color: ${passed ? '#065f46' : '#9f1239'}">
+                        ${passed ? 'PASS' : 'FAIL'}
+                    </div>
+                </div>
+                <div class="preview-info-item">
+                    <div class="preview-info-label">File Size</div>
+                    <div class="preview-info-value">${formatFileSize(result.fileSize)}</div>
+                </div>
+                <div class="preview-info-item">
+                    <div class="preview-info-label">Duration</div>
+                    <div class="preview-info-value" style="color: ${analysis.exceedsDuration ? '#9f1239' : '#0f172a'}">
+                        ${analysis.durationSeconds}s
+                    </div>
+                </div>
+                <div class="preview-info-item">
+                    <div class="preview-info-label">Loop Count</div>
+                    <div class="preview-info-value" style="color: ${analysis.loopCount === Infinity || analysis.exceedsLoops ? '#92400e' : '#0f172a'}">
+                        ${analysis.loopCount === Infinity ? '∞' : analysis.loopCount}
+                    </div>
+                </div>
+                <div class="preview-info-item">
+                    <div class="preview-info-label">Frame Count</div>
+                    <div class="preview-info-value">${analysis.frameCount}</div>
+                </div>
+                <div class="preview-info-item">
+                    <div class="preview-info-label">Animated</div>
+                    <div class="preview-info-value">${analysis.isAnimated ? 'Yes' : 'No'}</div>
+                </div>
+            `;
+
+            previewModal.classList.add('show');
+        };
+
+        // Close modal
+        closeModal.addEventListener('click', () => {
+            previewModal.classList.remove('show');
+        });
+
+        // Close modal when clicking outside
+        previewModal.addEventListener('click', (e) => {
+            if (e.target === previewModal) {
+                previewModal.classList.remove('show');
+            }
+        });
+
+        // Close modal with Escape key
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && previewModal.classList.contains('show')) {
+                previewModal.classList.remove('show');
+            }
+        });
 
         function formatFileSize(bytes) {
             if (bytes < 1024) return bytes + ' B';
